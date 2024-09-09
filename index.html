@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>富士トライアスロン2024 結果ヴィジュアライザ</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+	<script>
+		const file = 'data/result.json';
+
+		const focus_id = ['4026', '5081'];
+
+		const g = {};
+
+		const clear = () => { };
+
+		const generate = () => {
+			console.log(g);
+		}
+
+		window.addEventListener('load', () => {
+			const context = document.querySelector('#chart');
+
+			fetch(file)
+				.then(res => res.json())
+				.then(json => g.raw = json)
+				.then(json => {
+					const valid_record_sec = json.map(x => x.record_sec).filter(x => x);
+					const min = Math.min(...valid_record_sec);
+					const max = Math.max(...valid_record_sec);
+
+					const accumulate = Array(max - min).fill(0)
+						.map((_, i) => min + i)
+						.map(x => {
+							return {
+								x,
+								y: valid_record_sec.filter(t => t < x).length,
+							};
+						});
+					const accumulate_ratio = accumulate
+						.map(({ x, y }) => ({ x, y: y / valid_record_sec.length * 100 }));
+
+					const data = {
+						datasets: [{
+							label: '総合タイム',
+							type: 'line',
+							showLine: true,
+							pointRadius: 0,
+							pointHitRadius: 0,
+							data: accumulate_ratio,
+							// backgroundColor: 'rgb(000, 111, 222)',
+							order: 0,
+						}, ...focus_id.map((id, i) => {
+							const d = json.find(data => data.number === id);
+							const x = d.record_sec;
+							return {
+								label: d.given_name + ' ' + d.family_name,
+								data: [{ x, y: accumulate_ratio.find(n => n.x === x).y, tag: d }],
+								order: i + 1,
+							};
+						})],
+					};
+
+					new Chart(context, {
+						type: 'scatter',
+						data,
+						options: {
+							scales: {
+								x: {
+									type: 'linear',
+									position: 'bottom',
+									min, max,
+								},
+								y: {
+									type: 'linear',
+									position: 'left',
+									min: 0,
+									max: 100,
+									ticks: {
+										stepSize: 10,
+									},
+								}
+							},
+							plugins: {
+								tooltip: {
+									callbacks: {
+										label: (items, data) => {
+											const d = items.raw.tag;
+											console.log(items.raw.tag);
+											console.log(items);
+											const time = d.record;
+											return `${d.given_name}${d.family_name} ${time}, 上位${items.raw.y.toString().substring(0, 4)}%`
+										},
+									}
+								}
+							}
+						}
+					})
+				});
+		}, { once: true });
+	</script>
+
+	<style>
+	</style>
+</head>
+
+<body>
+	<h1>富士トライアスロン2024</h1>
+	<canvas id="chart"></canvas>
+</body>
+
+</html>
