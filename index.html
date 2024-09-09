@@ -9,7 +9,14 @@
 	<script>
 		const file = 'data/result.json';
 
-		const focus_id = ['4026', '5081', '3151'];
+		const focus_id = (() => {
+			const query = window.location.search.substring(1).split('&');
+			const f = query.find(q => q.startsWith('focus='));
+			if (f) {
+				return f.split('=')[1].split(',');
+			}
+			return [];
+		})();
 
 		/**
 		 * 
@@ -58,7 +65,7 @@
 					pointHitRadius: 0,
 					data: accumulate_ratio,
 					// backgroundColor: 'rgb(000, 111, 222)',
-					order: 0,
+					order: 1000,
 				}, ...focus_id.map((id, i) => {
 					const d = g.data.find(data => data.number === id);
 					const x = d[key_sec];
