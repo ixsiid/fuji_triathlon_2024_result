@@ -34,7 +34,42 @@
 				g.chart.destroy();
 				g.chart = null;
 			}
+
+			document.querySelector('#compare_record').textContent = '';
 		};
+
+		const record_rows = () => {
+			if (focus_id.length === 0) return;
+
+			const tbody = document.querySelector('#compare_record');
+			const root = g.data.find(x => x.number === focus_id[0]);
+
+			focus_id.forEach(id => {
+				const d = g.data.find(x => x.number === id);
+
+				const tr = document.createElement('tr');
+
+				const name_cell = document.createElement('th');
+				name_cell.textContent = d.given_name + ' ' + d.family_name;
+				tr.appendChild(name_cell);
+
+				['swim', 'bike', 'split', 'run', 'record'].forEach(k => {
+					const td_value = document.createElement('td');
+					const td_delta = document.createElement('td');
+
+					td_value.textContent = d[k];
+					const delta = d[k + '_sec'] - root[k + '_sec'];
+					td_delta.classList.add(delta > 0 ? 'positive' : delta < 0 ? 'negative' : 'zero');
+					const dv = Math.abs(delta);
+					td_delta.textContent = `${Math.floor(dv / 60)}:${dv % 60}`;
+
+					tr.appendChild(td_value);
+					tr.appendChild(td_delta);
+				});
+
+				tbody.appendChild(tr);
+			});
+		}
 
 		const draw = () => {
 			clear();
@@ -110,8 +145,10 @@
 					},
 					responsive: true,
 				}
-			})
-		}
+			});
+
+			record_rows();
+		};
 
 		window.addEventListener('load', () => {
 			g.context = document.querySelector('#chart');
@@ -198,6 +235,46 @@
 			width: calc(90vw - 15em);
 			height: 80vh;
 		}
+
+		#compare_table {
+			border-collapse: collapse;
+
+			td,
+			th {
+				border: solid black 1px;
+				padding: 0.1ex 0.3em;
+			}
+		}
+
+		#compare_record {
+			td {
+				text-align: right;
+			}
+
+			.positive {
+				color: black;
+			}
+
+			.positive::before {
+				content: '+';
+			}
+
+			.negative {
+				color: red;
+			}
+
+			.negative::before {
+				content: '-';
+			}
+
+			.zero {
+				color: gray;
+			}
+
+			.zero::before {
+				content: '±';
+			}
+		}
 	</style>
 </head>
 
@@ -212,7 +289,27 @@
 				<p><select id="section" multiple disabled></select></p>
 			</div>
 		</div>
-		<div id="chart_area"><canvas id="chart"></canvas></div>
+		<div id="chart_area">
+			<canvas id="chart"></canvas>
+			<table id="compare_table">
+				<thead>
+					<tr>
+						<th>名前</th>
+						<th>スイム</th>
+						<th>⊿</th>
+						<th>バイク</th>
+						<th>⊿</th>
+						<th>スプリット</th>
+						<th>⊿</th>
+						<th>ラン</th>
+						<th>⊿</th>
+						<th>総合</th>
+						<th>⊿</th>
+					</tr>
+				</thead>
+				<tbody id="compare_record"></tbody>
+			</table>
+		</div>
 	</div>
 </body>
 
