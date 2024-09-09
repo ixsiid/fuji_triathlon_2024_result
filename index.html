@@ -7,11 +7,11 @@
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 	<script>
-		const file = 'data/result.json';
+		const file = 'data/course.json';
 
-		const focus_id = (() => {
+		const member_ids = (() => {
 			const query = window.location.search.substring(1).split('&');
-			const f = query.find(q => q.startsWith('focus='));
+			const f = query.find(q => q.startsWith('members='));
 			if (f) {
 				return f.split('=')[1].split(',');
 			}
@@ -39,12 +39,12 @@
 		};
 
 		const record_rows = () => {
-			if (focus_id.length === 0) return;
+			if (member_ids.length === 0) return;
 
 			const tbody = document.querySelector('#compare_record');
-			const root = g.data.find(x => x.number === focus_id[0]);
+			const root = g.data.find(x => x.number === member_ids[0]);
 
-			focus_id.forEach(id => {
+			member_ids.forEach(id => {
 				const d = g.data.find(x => x.number === id);
 
 				const tr = document.createElement('tr');
@@ -76,38 +76,40 @@
 
 			const key_sec = g.kind + '_sec';
 
-			const valid_sec = g.target.map(x => x[key_sec]).filter(x => x);
-			const min = Math.min(...valid_sec);
-			const max = Math.max(...valid_sec);
+			const time_step_sec = 600;
 
-			const accumulate = Array(max - min).fill(0)
-				.map((_, i) => min + i)
+			const valid_sec = g.target.map(x => x[key_sec]).filter(x => x);
+			const time_min = Math.floor(Math.min(...valid_sec) / time_step_sec) * time_step_sec;
+			const time_max = Math.ceil(Math.max(...valid_sec) / time_step_sec) * time_step_sec;
+
+			const accumulate = Array(time_max - time_min).fill(0)
+				.map((_, i) => time_min + i)
 				.map(x => {
 					return {
 						x,
 						y: valid_sec.filter(t => t < x).length,
 					};
 				});
-			const accumulate_ratio = accumulate
-				.map(({ x, y }) => ({ x, y: y / valid_sec.length * 100 }));
 
 			const data = {
 				datasets: [{
 					label: '全体累積分布',
 					type: 'line',
 					showLine: true,
+					tension: 0.05,
 					pointRadius: 0,
 					pointHitRadius: 0,
-					data: accumulate_ratio,
+					data: accumulate,
 					// backgroundColor: 'rgb(000, 111, 222)',
 					order: 1000,
-				}, ...focus_id.map((id, i) => {
+				}, ...member_ids.map((id, i) => {
 					const d = g.data.find(data => data.number === id);
 					const x = d[key_sec];
 					return {
 						label: d.given_name + ' ' + d.family_name,
-						data: [{ x, y: accumulate_ratio.find(n => n.x === x)?.y, tag: d }],
+						data: [{ x, y: accumulate.find(n => n.x === x)?.y, tag: d }],
 						order: i + 1,
+						pointRadius: 8,
 					};
 				})],
 			};
@@ -120,13 +122,25 @@
 						x: {
 							type: 'linear',
 							position: 'bottom',
-							min, max,
+							min: time_min,
+							max: time_max,
+							ticks: {
+								callback: tick => {
+									const h = Math.floor(tick / 3600);
+									const m = Math.floor((tick - h * 3600) / 60);
+									const s = tick % 60;
+									return [h, m, s].map(x => ('00' + x).slice(-2)).join(':');
+								},
+								autoSkip: true,
+								stepSize: 600,
+							},
 						},
 						y: {
 							type: 'linear',
 							position: 'left',
 							min: 0,
-							max: 100,
+							max: g.target.length + 1,
+							reverse: true,
 							ticks: {
 								stepSize: 10,
 							},
@@ -135,13 +149,18 @@
 					plugins: {
 						tooltip: {
 							callbacks: {
-								label: (items, data) => {
+								label: (items) => {
+									console.log(items);
 									const d = items.raw.tag;
 									const time = d[g.kind];
-									return `${d.given_name}${d.family_name} ${time}, 上位${items.raw.y.toString().substring(0, 4)}%`
+									return `${d.given_name}${d.family_name} ${time}, ${items.raw.y}位, 上位${(items.raw.y / g.target.length * 100).toString().substring(0, 4)}%`
 								},
 							}
-						}
+						},
+
+						legend: {
+							display: false,
+						},
 					},
 					responsive: true,
 				}
@@ -199,6 +218,12 @@
 
 			fetch(file)
 				.then(res => res.json())
+				.then(json => {
+					// jsonの内、dataを除外して g.course に格納する
+					g.course = Object.fromEntries(Object.keys(json).filter(x => x !== 'result').map(k => ([k, json[k]])));
+					document.querySelector('#course_name').textContent = g.course.name;
+					return json.result;
+				})
 				.then(json => g.target = g.data = json)
 				.then(json => {
 					const sections = json.map(d => d.section).filter(x => x).filter((x, i, a) => a.indexOf(x) === i);
@@ -279,7 +304,7 @@
 </head>
 
 <body>
-	<h1>富士トライアスロン2024</h1>
+	<h1 id="course_name"></h1>
 	<div id="view">
 		<div id="controller">
 			<div id="buttons"></div>
