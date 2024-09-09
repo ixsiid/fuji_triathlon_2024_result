@@ -9,9 +9,18 @@
 	<script>
 		const file = 'data/result.json';
 
-		const focus_id = ['4026', '5081'];
+		const focus_id = ['4026', '5081', '3151'];
 
-		const g = {};
+		/**
+		 * 
+		 * data: [],
+		 * target: filted data,
+		 * chart: chart object
+		 * kind: record, swim, bike, run, split
+		 */
+		const g = {
+			kind: 'record',
+		};
 
 		const clear = () => {
 			if (g.chart) {
@@ -20,12 +29,12 @@
 			}
 		};
 
-		const draw = (key) => {
+		const draw = () => {
 			clear();
 
-			const key_sec = key + '_sec';
+			const key_sec = g.kind + '_sec';
 
-			const valid_sec = g.data.map(x => x[key_sec]).filter(x => x);
+			const valid_sec = g.target.map(x => x[key_sec]).filter(x => x);
 			const min = Math.min(...valid_sec);
 			const max = Math.max(...valid_sec);
 
@@ -55,7 +64,7 @@
 					const x = d[key_sec];
 					return {
 						label: d.given_name + ' ' + d.family_name,
-						data: [{ x, y: accumulate_ratio.find(n => n.x === x).y, tag: d }],
+						data: [{ x, y: accumulate_ratio.find(n => n.x === x)?.y, tag: d }],
 						order: i + 1,
 					};
 				})],
@@ -86,12 +95,13 @@
 							callbacks: {
 								label: (items, data) => {
 									const d = items.raw.tag;
-									const time = d[key];
+									const time = d[g.kind];
 									return `${d.given_name}${d.family_name} ${time}, 上位${items.raw.y.toString().substring(0, 4)}%`
 								},
 							}
 						}
-					}
+					},
+					responsive: true,
 				}
 			})
 		}
@@ -99,33 +109,104 @@
 		window.addEventListener('load', () => {
 			g.context = document.querySelector('#chart');
 
-			['record', 'swim', 'bike', 'split', 'run'].forEach(id => {
-				const button = document.querySelector('#' + id);
-				button.addEventListener('click', () => {
-					draw(button.id);
+			{
+				const button_group = document.querySelector('#buttons');
+				[
+					{ id: 'record', label: '総合' },
+					{ id: 'swim', label: 'スイム' },
+					{ id: 'bike', label: 'バイク' },
+					{ id: 'split', label: 'スプリット' },
+					{ id: 'run', label: 'ラン' }
+				].forEach(({ id, label }) => {
+					const button = document.createElement('button');
+					button.id = id;
+					button.textContent = label;
+
+					button.addEventListener('click', () => {
+						g.kind = id;
+						draw();
+					});
+					button_group.appendChild(button);
 				});
-			})
+			}
+
+			{
+
+				const section_all = document.querySelector('#section_all');
+				const section = document.querySelector('#section');
+
+				const update_data_filter = () => {
+					if (section_all.checked) g.target = g.data;
+					else {
+						const values = Array.from(section.querySelectorAll('option')).filter(x => x.selected).map(x => x.value);
+						g.target = g.data.filter(k => values.includes(k.section));
+					}
+					draw();
+				};
+
+				section_all.addEventListener('change', () => {
+					section.disabled = section_all.checked;
+
+					update_data_filter();
+				});
+
+				section.addEventListener('change', () => update_data_filter());
+			}
 
 			fetch(file)
 				.then(res => res.json())
-				.then(json => g.data = json)
-				.then(json => draw('record'));
+				.then(json => g.target = g.data = json)
+				.then(json => {
+					const sections = json.map(d => d.section).filter(x => x).filter((x, i, a) => a.indexOf(x) === i);
+					const s = document.querySelector('#section');
+					sections.forEach(k => {
+						const option = document.createElement('option');
+						option.value = k;
+						option.textContent = k;
+						option.selected = true;
+						s.appendChild(option);
+					});
+					s.setAttribute('size', s.childElementCount);
+
+					return json;
+				})
+				.then(() => draw());
 		}, { once: true });
 	</script>
 
 	<style>
+		#view {
+			display: flex;
+		}
+
+		#buttons button {
+			display: block;
+		}
+
+		#controller {
+			width: 14em;
+		}
+
+		#chart_area {
+			width: calc(90vw - 15em);
+			height: 80vh;
+		}
 	</style>
 </head>
 
 <body>
 	<h1>富士トライアスロン2024</h1>
-	<canvas id="chart"></canvas>
+	<div id="view">
+		<div id="controller">
+			<div id="buttons"></div>
 
-	<button id="record">総合</button>
-	<button id="swim">スイム</button>
-	<button id="bike">バイク</button>
-	<button id="split">スプリット</button>
-	<button id="run">ラン</button>
+			<div>
+				<p><label><input type="checkbox" id="section_all" checked>すべて</label></p>
+				<p><select id="section" multiple disabled></select></p>
+			</div>
+		</div>
+		<div id="chart_area"><canvas id="chart"></canvas></div>
+	</div>
 </body>
 
 </html>
