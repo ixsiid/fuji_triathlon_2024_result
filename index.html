@@ -82,6 +82,10 @@
 			const time_min = Math.floor(Math.min(...valid_sec) / time_step_sec) * time_step_sec;
 			const time_max = Math.ceil(Math.max(...valid_sec) / time_step_sec) * time_step_sec;
 
+			const average = valid_sec.reduce((a, b) => a + b / valid_sec.length, 0);
+			const variance = valid_sec.reduce((a, b) => a + Math.pow(b - average, 2) / valid_sec.length, 0);
+			const stdev = Math.sqrt(variance);
+
 			const accumulate = Array(time_max - time_min).fill(0)
 				.map((_, i) => time_min + i)
 				.map(x => {
@@ -107,7 +111,11 @@
 					const x = d[key_sec];
 					return {
 						label: d.given_name + ' ' + d.family_name,
-						data: [{ x, y: accumulate.find(n => n.x === x)?.y, tag: d }],
+						data: [{
+							x, y: accumulate.find(n => n.x === x)?.y,
+							tag: d,
+							score: (x - average) / stdev * 10 + 50
+						}],
 						order: i + 1,
 						pointRadius: 8,
 					};
@@ -150,10 +158,9 @@
 						tooltip: {
 							callbacks: {
 								label: (items) => {
-									console.log(items);
 									const d = items.raw.tag;
 									const time = d[g.kind];
-									return `${d.given_name}${d.family_name} ${time}, ${items.raw.y}位, 上位${(items.raw.y / g.target.length * 100).toString().substring(0, 4)}%`
+									return `${d.given_name}${d.family_name} ${time}, ${items.raw.y}位, 上位${(items.raw.y / g.target.length * 100).toString().substring(0, 4)}%, スコア ${items.raw.score.toString().substring(0, 2)}`
 								},
 							}
 						},
